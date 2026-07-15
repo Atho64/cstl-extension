@@ -13,8 +13,10 @@
 body {
   margin: 0;
   padding: 12px;
-  width: 300px;
-  font: 13px/1.4 system-ui, sans-serif;
+  /* Desktop: 300px. On mobile (Quetta Android) the popup fills the screen width
+     so we clamp to a sensible range. */
+  width: clamp(300px, 100vw, 420px);
+  font: 14px/1.5 system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
 }
@@ -23,24 +25,24 @@ header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 h1 {
-  font-size: 14px;
+  font-size: 15px;
   margin: 0;
   font-weight: 600;
 }
 
-.ver { margin: 0; color: var(--muted); font-size: 11px; }
+.ver { margin: 0; color: var(--muted); font-size: 12px; }
 
 label {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
@@ -51,7 +53,9 @@ select, button, input[type="number"] {
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--text);
-  padding: 8px 10px;
+  /* Touch target minimum 44px height per WCAG / Apple HIG */
+  min-height: 44px;
+  padding: 8px 12px;
 }
 
 select, input[type="number"] { width: 100%; }
@@ -60,11 +64,15 @@ select, input[type="number"] { width: 100%; }
   display: flex;
   gap: 8px;
   margin: 10px 0;
+  flex-wrap: wrap;
 }
 
 button {
   cursor: pointer;
   flex: 1;
+  /* Minimum 44px touch target */
+  min-height: 44px;
+  touch-action: manipulation;
 }
 
 button.primary {
@@ -73,21 +81,36 @@ button.primary {
 }
 
 button:hover { filter: brightness(1.08); }
+button:active { filter: brightness(0.92); }
 
 .status {
   min-height: 2.5em;
   margin: 8px 0;
-  padding: 8px;
+  padding: 10px;
   background: var(--card);
   border-radius: 8px;
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   white-space: pre-wrap;
 }
 
 .hint {
   margin: 8px 0 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* ── Mobile / Quetta Android adjustments ── */
+@media (max-width: 420px) {
+  body {
+    padding: 14px;
+    font-size: 15px;
+  }
+  select, button, input[type="number"] {
+    min-height: 48px;
+    font-size: 15px;
+  }
+  .row { gap: 10px; }
 }

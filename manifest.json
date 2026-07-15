@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "CSTL Auto Copas",
-  "version": "0.1.12",
+  "version": "0.1.13",
+  "minimum_chrome_version": "109",
   "description": "Bridge CSTL PWA ke tab LLM (Gemini, DeepSeek, Meta AI, ChatGPT) untuk auto copy-paste terjemahan.",
   "action": {
     "default_popup": "popup/popup.html",
