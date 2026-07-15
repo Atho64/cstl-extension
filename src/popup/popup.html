@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CSTL Auto Copas</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <h1>CSTL Auto Copas</h1>
+    <p class="ver" id="ver">v?</p>
+  </header>
+
+  <label>
+    Target
+    <select id="target">
+      <option value="gemini">Google Gemini</option>
+      <option value="deepseek">DeepSeek Chat</option>
+      <option value="meta">Meta AI</option>
+      <option value="chatgpt">ChatGPT</option>
+    </select>
+  </label>
+
+  <label>
+    Mode
+    <select id="mode">
+      <option value="semi">Semi (paste saja)</option>
+      <option value="full">Full (paste + send)</option>
+    </select>
+  </label>
+
+  <label id="geminiModelLabel">
+    Model Gemini
+    <select id="geminiModel">
+      <option value="default">Default (jangan ganti)</option>
+      <option value="flash_lite">Flash-Lite (non-think)</option>
+      <option value="flash">Flash (non-think)</option>
+      <option value="pro">Pro (non-think)</option>
+      <option value="flash_lite_think">Flash-Lite + Thinking</option>
+      <option value="flash_think">Flash + Thinking</option>
+      <option value="pro_think">Pro + Thinking</option>
+    </select>
+  </label>
+
+  <label id="deepseekModelLabel">
+    Model DeepSeek (V4)
+    <select id="deepseekModel">
+      <option value="default">Default (jangan ganti)</option>
+      <option value="cepat">Cepat / Instant</option>
+      <option value="pakar">Pakar / Expert</option>
+      <option value="cepat_think">Cepat + Pikir Mendalam</option>
+      <option value="pakar_think">Pakar + Pikir Mendalam</option>
+    </select>
+  </label>
+  <label id="metaModelLabel">
+    Mode Meta AI
+    <select id="metaModel">
+      <option value="default">Default (jangan ganti)</option>
+      <option value="instant">Instant</option>
+      <option value="berpikir">Berpikir (reasoning)</option>
+    </select>
+  </label>
+
+  <label>
+    Obrolan baru tiap N request
+    <input id="newTabEvery" type="number" min="0" max="100" step="1" value="0" />
+  </label>
+  <p class="hint" style="margin-top:-4px">
+    0 = lanjut chat yang sama<br />
+    1 = klik New Chat tiap request<br />
+    5 = New Chat tiap 5 request<br />
+    (bukan buka tab browser baru)
+  </p>
+
+  <p id="status" class="status">—</p>
+
+  <div class="row">
+    <button type="button" id="btnFetch" class="primary">Ambil Hasil</button>
+    <button type="button" id="btnOpen">Buka Target</button>
+  </div>
+  <div class="row">
+    <button type="button" id="btnResetCount">Reset counter tab</button>
+  </div>
+
+  <p class="hint">
+    DeepSeek V4: Cepat/Pakar + Pikir Mendalam.<br />
+    Gemini: Flash-Lite / Flash / Pro × Thinking on|off.<br />
+    ChatGPT: tidak perlu pilih model.<br />
+    Model switch = best-effort klik UI.
+  </p>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

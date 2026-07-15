@@ -1,0 +1,61 @@
+{
+  "manifest_version": 3,
+  "name": "CSTL Auto Copas",
+  "version": "0.1.12",
+  "description": "Bridge CSTL PWA ke tab LLM (Gemini, DeepSeek, Meta AI, ChatGPT) untuk auto copy-paste terjemahan.",
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "CSTL Auto Copas"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["tabs", "storage", "scripting", "clipboardWrite"],
+  "host_permissions": [
+    "https://gemini.google.com/*",
+    "https://chat.deepseek.com/*",
+    "https://meta.ai/*",
+    "https://www.meta.ai/*",
+    "https://chatgpt.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://atho64.github.io/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://atho64.github.io/*"
+      ],
+      "js": ["content/cstl-bridge.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["content/targets/gemini.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": ["content/targets/deepseek.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://meta.ai/*", "https://www.meta.ai/*"],
+      "js": ["content/targets/meta.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["content/targets/chatgpt.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
