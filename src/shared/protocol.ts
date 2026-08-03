@@ -1,7 +1,7 @@
 /** Protocol version — bump if breaking */
 export const CSTL_EXT_PROTOCOL = 1 as const;
 
-export type CopasTargetId = 'gemini' | 'deepseek' | 'meta' | 'chatgpt' | 'clipboard';
+export type CopasTargetId = 'gemini' | 'deepseek' | 'meta' | 'chatgpt' | 'qwen' | 'arena';
 
 export type CopasMode = 'semi' | 'full';
 
@@ -86,14 +86,14 @@ export interface ExtSettings {
   /** Meta AI mode: Instant or Berpikir (reasoning). */
   metaModel: MetaModelKey;
   /**
-   * Open a fresh LLM tab every N successful SEND requests.
-   * 0 = always reuse existing tab
-   * 1 = new tab every request
-   * N = new tab every N requests
+   * Start a fresh chat every N successful SEND requests in the existing tab.
+   * 0 = always reuse the current chat
+   * 1 = new chat every request
+   * N = new chat every N requests
    */
   newTabEvery: number;
-  /** Per-target send counters (for newTabEvery). */
-  sendCounts?: Partial<Record<'gemini' | 'deepseek' | 'meta' | 'chatgpt', number>>;
+  /** Per-target send counters. */
+  sendCounts?: Partial<Record<CopasTargetId, number>>;
 }
 
 export type CstlToExtMessage =
@@ -175,10 +175,10 @@ export const DEFAULT_SETTINGS: ExtSettings = {
   deepseekModel: 'default',
   metaModel: 'default',
   newTabEvery: 0,
-  sendCounts: { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0 },
+  sendCounts: { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0 },
 };
 
-export const CAPABLE_TARGETS: CopasTargetId[] = ['gemini', 'deepseek', 'meta', 'chatgpt'];
+export const CAPABLE_TARGETS: CopasTargetId[] = ['gemini', 'deepseek', 'meta', 'chatgpt', 'qwen', 'arena'];
 export const CAPABLE_MODES: CopasMode[] = ['semi', 'full'];
 export const GEMINI_MODEL_KEYS: GeminiModelKey[] = [
   'default',
@@ -259,7 +259,7 @@ export function mergeSettings(partial: Partial<ExtSettings> | undefined, base: E
   };
   if (!partial) return next;
 
-  if (partial.target === 'gemini' || partial.target === 'deepseek' || partial.target === 'meta' || partial.target === 'chatgpt' || partial.target === 'clipboard') {
+  if (partial.target === 'gemini' || partial.target === 'deepseek' || partial.target === 'meta' || partial.target === 'chatgpt' || partial.target === 'qwen' || partial.target === 'arena') {
     next.target = partial.target;
   }
   if (partial.mode === 'semi' || partial.mode === 'full') next.mode = partial.mode;
@@ -282,6 +282,8 @@ export function mergeSettings(partial: Partial<ExtSettings> | undefined, base: E
       deepseek: Math.max(0, Math.floor(Number(partial.sendCounts.deepseek) || 0)),
       meta: Math.max(0, Math.floor(Number(partial.sendCounts.meta) || 0)),
       chatgpt: Math.max(0, Math.floor(Number(partial.sendCounts.chatgpt) || 0)),
+      qwen: Math.max(0, Math.floor(Number(partial.sendCounts.qwen) || 0)),
+      arena: Math.max(0, Math.floor(Number(partial.sendCounts.arena) || 0)),
     };
   }
   return next;

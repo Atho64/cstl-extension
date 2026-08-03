@@ -64,7 +64,6 @@ function deepseekGetResponseText(): string {
     '[class*="think-block"]',
     // DeepSeek V4 kadang render thinking dalam <details>
     'details[class*="think"]',
-    'details[open]',
     // class utility yang sering dipakai DeepSeek untuk thinking wrapper
     '[class*="_thinking"]',
     '[class*="thinkingContent"]',

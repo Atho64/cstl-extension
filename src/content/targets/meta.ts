@@ -3,13 +3,13 @@ import {
   clickNewChat,
   clickSend,
   isGenerating,
-  pasteIntoComposer,
   sleep,
   waitForSelector,
   waitForStableAssistantText,
   type TargetAction,
   type TargetActionResult,
 } from './dom-utils';
+import { restoreNumberedLineBreaks } from '../../shared/text-utils';
 
 const cfg = TARGETS.meta;
 let lastSubmittedPayload = '';
@@ -82,14 +82,114 @@ async function selectMetaMode(mode: 'instant' | 'berpikir'): Promise<string> {
   return 'meta_mode_option_not_found';
 }
 
+/**
+ * Meta AI often renders each numbered translation line as adjacent inline
+ * spans / blocks, so innerText collapses to:
+ *   "1. foo2. bar3. baz"
+ * CSTL numbered format needs real newlines before each "N. " marker.
+ * Also handles mid-line glue like "...sakura.2. Arisa:".
+ */
 function cleanMetaResponseText(raw: string): string {
   let text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
   // Meta adds progress/action labels immediately before the response text.
-  text = text.replace(/^(?:Saya sedang menyusun|Generating|Thinking)?\s*(?:Text)?plaintext\s*/i, '');
-  // Some Meta response nodes store numbered lines as adjacent inline spans.
-  // Restore the intended line breaks without flattening normal prose.
-  text = text.replace(/(\d{4,6})\.\s/g, '\n$1. ');
-  return text.replace(/\n{3,}/g, '\n\n').trim();
+  text = text.replace(
+    /^(?:Saya sedang menyusun|Generating|Thinking|Meta AI)?\s*(?:Text)?plaintext\s*/i,
+    ''
+  );
+  // Accessibility / toolbar crumbs sometimes prefix the body.
+  text = text.replace(/^(?:Copy|Salin|Share|Bagikan|Regenerate)\s*/i, '');
+  text = restoreNumberedLineBreaks(text);
+  // Drop empty lines created by over-eager splits, keep single blanks max.
+  text = text
+    .split('\n')
+    .map((line) => line.replace(/\s+$/, ''))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  // If body starts with numbered CSTL lines, drop non-digit junk before first "N. ".
+  text = text.replace(/^[^\d\n]{0,80}?(?=\d{1,6}\.\s)/, '');
+  return text.trim();
+}
+
+/**
+ * Paste into Meta AI composer (Lexical / contenteditable).
+ *
+ * Generic pasteIntoComposer does execCommand('insertText') AND then fires
+ * InputEvent('input') with the same payload — Lexical often applies both,
+ * so the user sees the prompt twice (one flattened, one with newlines).
+ *
+ * Prefer a single ClipboardEvent('paste') path (same idea as ChatGPT),
+ * then one insertText fallback only if the composer is still empty.
+ */
+async function pasteIntoMetaComposer(el: HTMLElement, text: string): Promise<boolean> {
+  el.focus();
+  await sleep(60);
+
+  // Clear any previous draft without double-writing the new payload.
+  try {
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    document.execCommand('selectAll', false);
+    // Delete selection only — do not insert yet.
+    document.execCommand('delete', false);
+  } catch {
+    /* */
+  }
+  await sleep(40);
+
+  // Method 1 — ClipboardEvent paste (Lexical / React listen for this).
+  try {
+    const dt = new DataTransfer();
+    dt.setData('text/plain', text);
+    // Some editors also look at text/html; keep plain only to avoid double body.
+    const pasteEv = new ClipboardEvent('paste', {
+      clipboardData: dt,
+      bubbles: true,
+      cancelable: true,
+    });
+    el.dispatchEvent(pasteEv);
+    await sleep(120);
+    const after = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (after.length > 0) return true;
+  } catch {
+    /* */
+  }
+
+  // Method 2 — single insertText (no extra synthetic InputEvent after).
+  try {
+    el.focus();
+    document.execCommand('selectAll', false);
+    const ok = document.execCommand('insertText', false, text);
+    await sleep(80);
+    const after = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (ok && after.length > 0) return true;
+  } catch {
+    /* */
+  }
+
+  // Method 3 — last resort: assign text once + one input event.
+  try {
+    if (el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement) {
+      const proto = el instanceof HTMLTextAreaElement
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+      const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+      desc?.set?.call(el, text);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    } else {
+      el.textContent = text;
+      el.dispatchEvent(
+        new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text })
+      );
+    }
+    await sleep(80);
+    return (el.innerText || el.textContent || '').trim().length > 0;
+  } catch {
+    return false;
+  }
 }
 
 function getMetaMessageTexts(): string[] {
@@ -109,11 +209,20 @@ function getMetaMessageTexts(): string[] {
   for (const selector of selectors) {
     for (const node of Array.from(document.querySelectorAll<HTMLElement>(selector))) {
       if (seen.has(node) || !isVisible(node)) continue;
+      // Skip if an ancestor was already captured (avoid nested duplicates).
+      let parentCaptured = false;
+      for (const prev of seen) {
+        if (prev.contains(node) && prev !== node) {
+          parentCaptured = true;
+          break;
+        }
+      }
+      if (parentCaptured) continue;
       seen.add(node);
       const copy = node.cloneNode(true) as HTMLElement;
-      copy.querySelectorAll('button, [role="button"], svg, nav').forEach((child) => child.remove());
-      // Do not use compact() here: response line breaks are data that CSTL
-      // needs to retain when the translation is pasted back.
+      copy.querySelectorAll('button, [role="button"], svg, nav, script, style').forEach((child) => child.remove());
+      // Prefer innerText (keeps visual breaks). cleanMetaResponseText restores
+      // numbered CSTL lines if Meta collapses them into one line.
       const text = cleanMetaResponseText(copy.innerText || copy.textContent || '');
       if (text.length >= 3) texts.push(text);
     }
@@ -165,7 +274,10 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
       }
 
       messageBaseline = new Set(getMetaMessageTexts());
-      await pasteIntoComposer(el, msg.payload);
+      const pasted = await pasteIntoMetaComposer(el as HTMLElement, msg.payload);
+      if (!pasted) {
+        return { ok: false, requestId, error: 'paste_failed: gagal paste ke Meta AI composer' };
+      }
       lastSubmittedPayload = msg.payload;
       await sleep(150);
       if (msg.mode === 'full') {

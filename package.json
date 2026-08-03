@@ -1,16 +1,18 @@
 {
   "name": "cstl-extension",
   "private": true,
-  "version": "0.1.12",
+  "version": "0.1.21",
   "type": "module",
   "scripts": {
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx tests/run-tests.ts"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
     "esbuild": "^0.25.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.5.3"
   }
 }

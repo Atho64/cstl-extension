@@ -391,9 +391,9 @@ export async function selectModelInUi(
       'model picker',
       'flash',
       'pro',
-      '2.5 flash',
-      '2.5 pro',
-      '2.0 flash',
+      '3.6 flash',
+      '3.5 flash-lite',
+      'pro',
     ],
     48
   );
@@ -496,9 +496,9 @@ export async function selectGeminiMode(plan: {
       'model picker',
       'flash-lite',
       'flash lite',
-      '3.5 flash',
-      '3.1 flash-lite',
-      '3.1 pro',
+      '3.6 flash',
+      '3.5 flash-lite',
+      'pro',
       'flash',
       'pro',
     ],
@@ -571,11 +571,11 @@ export async function selectGeminiMode(plan: {
       if (!label || label.length > 160) continue;
       if (/\b(settings|pengaturan|akun|account)\b/.test(label)) continue;
       // If looking for plain Flash, skip Flash-Lite rows
-      if (p === 'flash' || p === '3.5 flash' || p === 'bantuan serbaguna') {
+      if (p === 'flash' || p === '3.6 flash' || p === 'bantuan serbaguna') {
         if (label.indexOf('flash-lite') >= 0 || label.indexOf('flash lite') >= 0) continue;
       }
       // If looking for Pro, skip non-pro flash rows
-      if (p === 'pro' || p === '3.1 pro') {
+      if (p === 'pro') {
         if (label.indexOf('flash') >= 0 && label.indexOf('pro') < 0) continue;
       }
       if (label.indexOf(p) >= 0) {
@@ -612,9 +612,9 @@ export async function selectGeminiMode(plan: {
           'model picker',
           'flash-lite',
           'flash lite',
-          '3.5 flash',
-          '3.1 flash-lite',
-          '3.1 pro',
+          '3.6 flash',
+          '3.5 flash-lite',
+          'pro',
           'flash',
           'pro',
         ],

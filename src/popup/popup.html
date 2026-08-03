@@ -19,6 +19,8 @@
       <option value="deepseek">DeepSeek Chat</option>
       <option value="meta">Meta AI</option>
       <option value="chatgpt">ChatGPT</option>
+      <option value="qwen">Qwen Studio</option>
+      <option value="arena">Arena Direct (tab terbuka)</option>
     </select>
   </label>
 
@@ -34,11 +36,11 @@
     Model Gemini
     <select id="geminiModel">
       <option value="default">Default (jangan ganti)</option>
-      <option value="flash_lite">Flash-Lite (non-think)</option>
-      <option value="flash">Flash (non-think)</option>
+      <option value="flash_lite">3.5 Flash-Lite (non-think)</option>
+      <option value="flash">3.6 Flash (non-think)</option>
       <option value="pro">Pro (non-think)</option>
-      <option value="flash_lite_think">Flash-Lite + Thinking</option>
-      <option value="flash_think">Flash + Thinking</option>
+      <option value="flash_lite_think">3.5 Flash-Lite + Thinking</option>
+      <option value="flash_think">3.6 Flash + Thinking</option>
       <option value="pro_think">Pro + Thinking</option>
     </select>
   </label>
@@ -63,7 +65,7 @@
   </label>
 
   <label>
-    Obrolan baru tiap N request
+    Chat baru tiap N request
     <input id="newTabEvery" type="number" min="0" max="100" step="1" value="0" />
   </label>
   <p class="hint" style="margin-top:-4px">
@@ -85,8 +87,10 @@
 
   <p class="hint">
     DeepSeek V4: Cepat/Pakar + Pikir Mendalam.<br />
-    Gemini: Flash-Lite / Flash / Pro × Thinking on|off.<br />
+    Gemini: 3.5 Flash-Lite / 3.6 Flash / Pro × Thinking on|off.<br />
     ChatGPT: tidak perlu pilih model.<br />
+    Qwen Studio: model default dari akun.<br />
+    Arena Direct: buka tab dan pilih model manual terlebih dahulu.<br />
     Model switch = best-effort klik UI.
   </p>
 

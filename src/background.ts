@@ -28,10 +28,26 @@ type Job = {
   cancelled: boolean;
 };
 
-let lastJob: Job | null = null;
+const jobs = new Map<string, Job>();
+let latestRequestId: string | null = null;
+const latestRequestByTarget = new Map<CopasTargetId, string>();
 
 // Track active full-auto polling so cancel can stop it
 const activePollers = new Map<string, { cancelled: boolean }>();
+
+function pruneJobs(): void {
+  if (jobs.size <= 100) return;
+  const stale = [...jobs.values()]
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .slice(0, jobs.size - 100);
+  for (const job of stale) {
+    if (activePollers.has(job.requestId)) continue;
+    jobs.delete(job.requestId);
+    if (latestRequestByTarget.get(job.target) === job.requestId) {
+      latestRequestByTarget.delete(job.target);
+    }
+  }
+}
 
 async function loadSettings(): Promise<ExtSettings> {
   const data = await chrome.storage.sync.get([
@@ -56,7 +72,7 @@ async function saveSettings(partial: Partial<ExtSettings>): Promise<ExtSettings>
     deepseekModel: next.deepseekModel,
     metaModel: next.metaModel,
     newTabEvery: next.newTabEvery,
-    sendCounts: next.sendCounts || { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0 },
+    sendCounts: next.sendCounts || { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0 },
   });
   return next;
 }
@@ -115,7 +131,7 @@ function result(requestId: string, ok: boolean, text?: string, error?: string): 
  *   1 = New Chat every request
  *   N = New Chat every N requests
  */
-async function shouldStartNewChat(target: 'gemini' | 'deepseek' | 'meta' | 'chatgpt'): Promise<{
+async function shouldStartNewChat(target: CopasTargetId): Promise<{
   forceNew: boolean;
   count: number;
   every: number;
@@ -123,7 +139,7 @@ async function shouldStartNewChat(target: 'gemini' | 'deepseek' | 'meta' | 'chat
 }> {
   const settings = await loadSettings();
   const every = settings.newTabEvery || 0;
-  const counts = { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, ...(settings.sendCounts || {}) };
+  const counts = { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0, ...(settings.sendCounts || {}) };
   const nextCount = (counts[target] || 0) + 1;
   counts[target] = nextCount;
   await saveSettings({ sendCounts: counts });
@@ -153,6 +169,10 @@ async function findOrCreateTab(target: CopasTargetId): Promise<number> {
       }
     }
     return existing.id;
+  }
+
+  if (target === 'arena') {
+    throw new Error('arena_tab_not_found: buka https://arena.ai/text/direct dan pilih model terlebih dahulu');
   }
 
   const tab = await chrome.tabs.create({ url: cfg.url, active: true });
@@ -228,6 +248,10 @@ async function sendToTab(
           ? 'content/targets/meta.js'
         : target === 'chatgpt'
           ? 'content/targets/chatgpt.js'
+        : target === 'qwen'
+          ? 'content/targets/qwen.js'
+        : target === 'arena'
+          ? 'content/targets/arena.js'
         : target === 'gemini'
           ? 'content/targets/gemini.js'
           : null;
@@ -302,12 +326,12 @@ async function fullAutoFlow(
 
   await pushStatus(requestId, 'submitted', 'Pesan terkirim. Menunggu respons...');
   // Give the stream time to start so we don't treat pre-send idle as "done".
-  await sleep(target === 'deepseek' ? 1800 : 1200);
+  await sleep(target === 'deepseek' ? 1800 : target === 'qwen' ? 3000 : 1200);
 
   // 2. Wait until UI stops reporting "generating".
   // DeepSeek's Stop control is flaky; TARGET_FETCH_LAST also waits for text
   // stability, so we only use this loop as a soft pre-wait, not the sole signal.
-  const pollTimeout = 180000; // 3 min max soft wait for stop/idle UI
+  const pollTimeout = target === 'arena' ? 120000 : 180000;
   const pollInterval = 800;
   const deadline = Date.now() + pollTimeout;
   let sawGenerating = false;
@@ -315,7 +339,7 @@ async function fullAutoFlow(
   let pollCount = 0;
   // DeepSeek: require several consecutive idle samples before trusting UI.
   // Gemini: one idle sample is usually enough (Send re-enable is solid).
-  const idleNeeded = target === 'deepseek' ? 4 : 2;
+  const idleNeeded = target === 'deepseek' ? 4 : target === 'qwen' ? 5 : 2;
 
   while (Date.now() < deadline) {
     if (poller.cancelled) {
@@ -366,19 +390,16 @@ async function fullAutoFlow(
   }
 
   // 4. Return result (partial is still ok — text was best-effort stable)
-  if (lastJob) lastJob.stage = fetchRes.stage === 'done_partial' ? 'done_partial' : 'done';
+  const job = jobs.get(requestId);
+  if (job) job.stage = fetchRes.stage === 'done_partial' ? 'done_partial' : 'done';
   return result(requestId, true, fetchRes.text);
 }
 
 async function handleSend(msg: Extract<CstlToExtMessage, { type: 'COPAS_SEND' }>): Promise<ExtToCstlMessage> {
   const settings = await loadSettings();
-  const target = msg.target && msg.target !== 'clipboard' ? msg.target : settings.target;
+  const target = msg.target || settings.target;
   const mode = msg.mode || settings.mode;
   const modelKey = modelKeyFor(settings, target);
-
-  if (target === 'clipboard') {
-    return result(msg.requestId, false, undefined, 'clipboard_target_not_supported_use_gemini_deepseek_or_meta');
-  }
 
   // Cancel any previous active poller
   const prev = activePollers.get(msg.requestId);
@@ -387,7 +408,7 @@ async function handleSend(msg: Extract<CstlToExtMessage, { type: 'COPAS_SEND' }>
   const poller = { cancelled: false };
   activePollers.set(msg.requestId, poller);
 
-  lastJob = {
+  const job: Job = {
     requestId: msg.requestId,
     target,
     mode,
@@ -396,12 +417,18 @@ async function handleSend(msg: Extract<CstlToExtMessage, { type: 'COPAS_SEND' }>
     createdAt: Date.now(),
     cancelled: false,
   };
+  jobs.set(msg.requestId, job);
+  latestRequestId = msg.requestId;
+  latestRequestByTarget.set(target, msg.requestId);
+  pruneJobs();
 
   try {
-    const chatPolicy = await shouldStartNewChat(target);
+    const chatPolicy = target === 'arena'
+      ? { forceNew: false, count: 0, every: 0, settings }
+      : await shouldStartNewChat(target);
     const tabId = await findOrCreateTab(target);
-    lastJob.tabId = tabId;
-    lastJob.stage = 'finding_tab';
+    job.tabId = tabId;
+    job.stage = 'finding_tab';
 
     if (chatPolicy.forceNew) {
       await pushStatus(
@@ -416,6 +443,10 @@ async function handleSend(msg: Extract<CstlToExtMessage, { type: 'COPAS_SEND' }>
       } else if (target === 'chatgpt') {
         // ChatGPT: navigate to root URL for a fresh chat
         await chrome.tabs.update(tabId, { url: TARGETS.chatgpt.url });
+        await waitTabComplete(tabId, 30000);
+        await sleep(1000);
+      } else if (target === 'qwen') {
+        await chrome.tabs.update(tabId, { url: TARGETS.qwen.url });
         await waitTabComplete(tabId, 30000);
         await sleep(1000);
       } else {
@@ -454,12 +485,12 @@ async function handleSend(msg: Extract<CstlToExtMessage, { type: 'COPAS_SEND' }>
     });
 
     if (!pasteRes?.ok) {
-      lastJob.stage = 'error';
+      job.stage = 'error';
       activePollers.delete(msg.requestId);
       return result(msg.requestId, false, undefined, pasteRes?.error || 'paste_failed');
     }
 
-    lastJob.stage = 'pasted';
+    job.stage = 'pasted';
     activePollers.delete(msg.requestId);
     return status(
       msg.requestId,
@@ -468,7 +499,7 @@ async function handleSend(msg: Extract<CstlToExtMessage, { type: 'COPAS_SEND' }>
     );
   } catch (e) {
     activePollers.delete(msg.requestId);
-    lastJob.stage = 'error';
+    job.stage = 'error';
     return result(msg.requestId, false, undefined, e instanceof Error ? e.message : String(e));
   }
 }
@@ -477,13 +508,15 @@ async function handleFetch(
   msg: Extract<CstlToExtMessage, { type: 'COPAS_FETCH_RESULT' }>
 ): Promise<ExtToCstlMessage> {
   const settings = await loadSettings();
-  const target =
-    msg.target && msg.target !== 'clipboard'
-      ? msg.target
-      : lastJob?.target || settings.target;
+  const requestedTarget = msg.target || settings.target;
+  const targetRequestId = latestRequestByTarget.get(requestedTarget);
+  const priorJob = jobs.get(msg.requestId)
+    || (targetRequestId ? jobs.get(targetRequestId) : undefined)
+    || (latestRequestId ? jobs.get(latestRequestId) : undefined);
+  const target = msg.target || priorJob?.target || settings.target;
 
   try {
-    let tabId = lastJob?.tabId;
+    let tabId = priorJob?.tabId;
     if (tabId == null) {
       tabId = await findOrCreateTab(target);
     } else {
@@ -503,7 +536,7 @@ async function handleFetch(
     if (!fetchRes?.ok) {
       return result(msg.requestId, false, undefined, fetchRes?.error || 'fetch_failed');
     }
-    if (lastJob) lastJob.stage = 'done';
+    if (priorJob) priorJob.stage = 'done';
     return result(msg.requestId, true, fetchRes.text || '');
   } catch (e) {
     return result(msg.requestId, false, undefined, e instanceof Error ? e.message : String(e));
@@ -544,7 +577,8 @@ async function route(msg: CstlToExtMessage): Promise<ExtToCstlMessage> {
       // Cancel active poller
       const p = activePollers.get(msg.requestId);
       if (p) p.cancelled = true;
-      if (lastJob?.requestId === msg.requestId) lastJob.stage = 'cancelled';
+      const job = jobs.get(msg.requestId);
+      if (job) job.stage = 'cancelled';
       activePollers.delete(msg.requestId);
       return status(msg.requestId, 'cancelled');
     }
@@ -553,8 +587,10 @@ async function route(msg: CstlToExtMessage): Promise<ExtToCstlMessage> {
   }
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || typeof msg !== 'object' || !msg.type) return;
+  if (sender.id !== chrome.runtime.id) return;
+  if (msg.v !== CSTL_EXT_PROTOCOL || typeof msg.requestId !== 'string') return;
   route(msg as CstlToExtMessage)
     .then(sendResponse)
     .catch((e) =>

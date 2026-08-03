@@ -11,15 +11,22 @@ import {
 } from '../shared/protocol';
 
 function replyToPage(msg: ExtToCstlMessage): void {
-  window.postMessage({ source: SOURCE_EXT, msg }, '*');
+  window.postMessage({ source: SOURCE_EXT, msg }, window.location.origin);
+}
+
+function isAllowedOrigin(origin: string): boolean {
+  if (origin !== window.location.origin) return false;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === 'atho64.github.io';
 }
 
 window.addEventListener('message', (event: MessageEvent) => {
-  if (event.source !== window) return;
+  if (event.source !== window || !isAllowedOrigin(event.origin)) return;
   const data = event.data;
   if (!data || data.source !== SOURCE_APP) return;
   const msg = data.msg as CstlToExtMessage | undefined;
   if (!msg || typeof msg !== 'object' || !msg.type) return;
+  if (msg.v !== CSTL_EXT_PROTOCOL || typeof (msg as { requestId?: unknown }).requestId !== 'string') return;
 
   chrome.runtime.sendMessage(msg, (response) => {
     const err = chrome.runtime.lastError;

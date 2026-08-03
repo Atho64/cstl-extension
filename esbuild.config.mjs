@@ -34,6 +34,8 @@ const entryPoints = {
   'content/targets/deepseek': 'src/content/targets/deepseek.ts',
   'content/targets/meta': 'src/content/targets/meta.ts',
   'content/targets/chatgpt': 'src/content/targets/chatgpt.ts',
+  'content/targets/qwen': 'src/content/targets/qwen.ts',
+  'content/targets/arena': 'src/content/targets/arena.ts',
   'popup/popup': 'src/popup/popup.ts',
 };
 

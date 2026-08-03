@@ -38,6 +38,10 @@ Browser extension (Chrome/Edge/Quetta Android — MV3) yang bekerja bersama CSTL
 - DeepSeek Chat (`chat.deepseek.com`)
 - Meta AI (`meta.ai`)
 - ChatGPT (`chatgpt.com`)
+- Qwen Studio (`chat.qwen.ai`)
+- Arena Direct (`arena.ai/text/direct`) — memakai tab yang sudah terbuka dan model yang dipilih manual
+
+Pemilih model Gemini saat ini mengenali **3.6 Flash**, **3.5 Flash-Lite**, dan **Pro**, masing-masing dengan opsi thinking aktif/nonaktif. Pemilihan dilakukan secara best-effort mengikuti label UI Gemini web.
 
 ## Fitur per Tab
 

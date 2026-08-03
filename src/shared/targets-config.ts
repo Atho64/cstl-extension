@@ -18,7 +18,7 @@ export type TargetConfig = {
   newChatLabels: string[];
 };
 
-export const TARGETS: Record<'gemini' | 'deepseek' | 'meta' | 'chatgpt', TargetConfig> = {
+export const TARGETS: Record<CopasTargetId, TargetConfig> = {
   gemini: {
     id: 'gemini',
     label: 'Google Gemini',
@@ -59,8 +59,8 @@ export const TARGETS: Record<'gemini' | 'deepseek' | 'meta' | 'chatgpt', TargetC
       // Model name chips in top bar (Flash / Pro / Gemini)
       'button[aria-label*="Flash" i]',
       'button[aria-label*="Pro" i]',
-      'button[aria-label*="2.5" i]',
-      'button[aria-label*="2.0" i]',
+      'button[aria-label*="3.6" i]',
+      'button[aria-label*="3.5" i]',
       // Avoid bare "Gemini" / "Settings" / haspopup that often hits account menu
     ],
     modelMenu: [
@@ -98,7 +98,8 @@ export const TARGETS: Record<'gemini' | 'deepseek' | 'meta' | 'chatgpt', TargetC
     sendButton: [
       'button[aria-label*="Send" i]',
       'div[role="button"][aria-label*="Send" i]',
-      'button:has(svg)',
+      'button[type="submit"]',
+      'button[aria-label*="Kirim" i]',
     ],
     assistantMessages: [
       '.ds-markdown',
@@ -217,19 +218,78 @@ export const TARGETS: Record<'gemini' | 'deepseek' | 'meta' | 'chatgpt', TargetC
       'mulai chat baru',
     ],
   },
+  qwen: {
+    id: 'qwen',
+    label: 'Qwen Studio',
+    url: 'https://chat.qwen.ai/',
+    matches: ['https://chat.qwen.ai/*'],
+    composer: [
+      'textarea[placeholder*="Message" i]',
+      'textarea[placeholder*="Ask" i]',
+      'textarea[placeholder*="Qwen" i]',
+      '[contenteditable="true"][role="textbox"]',
+      'div[contenteditable="true"]',
+      'textarea',
+    ],
+    sendButton: [
+      'button[aria-label*="Send" i]',
+      'button[aria-label*="Kirim" i]',
+      'button[type="submit"]',
+      '[data-testid*="send" i]',
+    ],
+    assistantMessages: [
+      '[data-message-author-role="assistant"]',
+      '[data-role="assistant"]',
+      '[class*="assistant" i] [class*="markdown" i]',
+      '[class*="message" i] [class*="markdown" i]',
+      '[class*="response" i]',
+    ],
+    modelPickerOpen: [],
+    modelMenu: [],
+    newChatLabels: ['new chat', 'chat baru', 'obrolan baru', 'new conversation', 'start new chat'],
+  },
+  arena: {
+    id: 'arena',
+    label: 'Arena Direct',
+    url: 'https://arena.ai/text/direct',
+    matches: ['https://arena.ai/text/direct*', 'https://arena.ai/c/*'],
+    composer: [
+      'textarea[placeholder="Ask anything…"]',
+      'textarea[placeholder*="Ask anything" i]',
+      'textarea',
+    ],
+    sendButton: [
+      'button[aria-label="Send message"]',
+      'button[aria-label*="Send" i]',
+      'button[type="submit"]',
+    ],
+    assistantMessages: [
+      'code.whitespace-pre-wrap.break-words',
+      '.code-block_container__lbMX4 code',
+      '[data-message-author-role="assistant"]',
+      '[data-role="assistant"]',
+      '[data-testid*="assistant" i]',
+      '[class*="assistant" i]',
+      '[class*="markdown" i]',
+      'main article',
+    ],
+    modelPickerOpen: [],
+    modelMenu: [],
+    newChatLabels: ['new chat'],
+  },
 };
 
 /** Search phrases used when clicking a model option (order = priority). */
 export const GEMINI_MODEL_MATCHERS: Record<GeminiModelKey, string[]> = {
   default: [],
   // Prefer distinctive labels from current Gemini ID UI
-  flash_lite: ['flash-lite', 'flash lite', '3.1 flash-lite', 'jawaban tercepat'],
-  flash: ['3.5 flash', 'flash', 'bantuan serbaguna'],
-  pro: ['3.1 pro', 'pro', 'matematika dan coding'],
-  flash_lite_think: ['flash-lite', 'flash lite', '3.1 flash-lite'],
-  flash_think: ['3.5 flash', 'flash'],
-  pro_think: ['3.1 pro', 'pro', 'matematika dan coding'],
-  thinking: ['pro', '3.1 pro'], // legacy → pro_think
+  flash_lite: ['3.5 flash-lite', 'flash-lite', 'flash lite', 'jawaban tercepat'],
+  flash: ['3.6 flash', 'flash', 'bantuan serbaguna'],
+  pro: ['pro', 'matematika dan coding'],
+  flash_lite_think: ['3.5 flash-lite', 'flash-lite', 'flash lite'],
+  flash_think: ['3.6 flash', 'flash'],
+  pro_think: ['pro', 'matematika dan coding'],
+  thinking: ['pro'], // legacy → pro_think
 };
 
 /**
@@ -251,11 +311,11 @@ export const DEEPSEEK_MODEL_MATCHERS: Record<DeepseekModelKey, string[]> = {
 
 export const GEMINI_MODEL_LABELS: Record<GeminiModelKey, string> = {
   default: 'Default (jangan ganti)',
-  flash_lite: 'Flash-Lite (non-think)',
-  flash: 'Flash (non-think)',
+  flash_lite: '3.5 Flash-Lite (non-think)',
+  flash: '3.6 Flash (non-think)',
   pro: 'Pro (non-think)',
-  flash_lite_think: 'Flash-Lite + Thinking',
-  flash_think: 'Flash + Thinking',
+  flash_lite_think: '3.5 Flash-Lite + Thinking',
+  flash_think: '3.6 Flash + Thinking',
   pro_think: 'Pro + Thinking',
   thinking: 'Pro + Thinking (legacy)',
 };
@@ -281,34 +341,34 @@ export function geminiModePlan(key: string): GeminiModePlan {
   switch (key) {
     case 'flash_lite':
       return {
-        modelMatchers: ['flash-lite', 'flash lite', '3.1 flash-lite', 'jawaban tercepat'],
+        modelMatchers: ['3.5 flash-lite', 'flash-lite', 'flash lite', 'jawaban tercepat'],
         thinking: false,
       };
     case 'flash':
       return {
-        modelMatchers: ['3.5 flash', 'bantuan serbaguna'],
+        modelMatchers: ['3.6 flash', 'bantuan serbaguna'],
         // Avoid bare "flash" first — it matches Flash-Lite too; use distinctive phrases
         thinking: false,
       };
     case 'pro':
       return {
-        modelMatchers: ['3.1 pro', 'matematika dan coding', 'pro'],
+        modelMatchers: ['matematika dan coding', 'pro'],
         thinking: false,
       };
     case 'flash_lite_think':
       return {
-        modelMatchers: ['flash-lite', 'flash lite', '3.1 flash-lite', 'jawaban tercepat'],
+        modelMatchers: ['3.5 flash-lite', 'flash-lite', 'flash lite', 'jawaban tercepat'],
         thinking: true,
       };
     case 'flash_think':
       return {
-        modelMatchers: ['3.5 flash', 'bantuan serbaguna'],
+        modelMatchers: ['3.6 flash', 'bantuan serbaguna'],
         thinking: true,
       };
     case 'pro_think':
     case 'thinking':
       return {
-        modelMatchers: ['3.1 pro', 'matematika dan coding', 'pro'],
+        modelMatchers: ['matematika dan coding', 'pro'],
         thinking: true,
       };
     default:
@@ -339,7 +399,7 @@ export function deepseekModePlan(key: string): DeepseekModePlan {
 }
 
 export function getTargetConfig(id: CopasTargetId): TargetConfig | null {
-  if (id === 'gemini' || id === 'deepseek' || id === 'meta' || id === 'chatgpt') return TARGETS[id];
+  if (id === 'gemini' || id === 'deepseek' || id === 'meta' || id === 'chatgpt' || id === 'qwen' || id === 'arena') return TARGETS[id];
   return null;
 }
 
@@ -353,6 +413,8 @@ export function tabMatchesTarget(url: string | undefined, id: CopasTargetId): bo
     if (id === 'deepseek') return u.hostname === 'chat.deepseek.com';
     if (id === 'meta') return u.hostname === 'meta.ai' || u.hostname === 'www.meta.ai';
     if (id === 'chatgpt') return u.hostname === 'chatgpt.com';
+    if (id === 'qwen') return u.hostname === 'chat.qwen.ai';
+    if (id === 'arena') return u.hostname === 'arena.ai' && (u.pathname.startsWith('/text/direct') || u.pathname.startsWith('/c/'));
   } catch {
     return false;
   }
