@@ -2,6 +2,7 @@ import { TARGETS, deepseekModePlan } from '../../shared/targets-config';
 import {
   clickNewChat,
   clickSend,
+  copyLastAssistantPlaintext,
   isGenerating,
   pasteIntoComposer,
   selectDeepseekMode,
@@ -202,21 +203,9 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
     }
 
     if (msg.type === 'TARGET_FETCH_LAST') {
-      // Tunggu sampai stream selesai (teks stabil).
-      // Saat Pikir Mendalam aktif, DeepSeek stream thinking dulu, baru respons —
-      // waitForStableAssistantText memastikan kita tidak scrape di tengah-tengah.
-      const waited = await waitForStableAssistantText(cfg.assistantMessages, {
-        timeoutMs: 90000,
-        pollMs: 350,
-        stableMs: 2000,
-        minChars: 12,
-        isStillGenerating: deepseekStillGenerating,
-      });
-
       // Gunakan DOM-level scraper yang membuang thinking block secara eksplisit.
       // Ini lebih akurat dari waited.text yang bisa mengandung thinking content.
-      const domText = deepseekGetResponseText();
-      const finalText = domText.trim() || waited.text.trim();
+      const finalText = await copyLastAssistantPlaintext(cfg.assistantMessages);
 
       if (!finalText) {
         return {
@@ -230,8 +219,7 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
         ok: true,
         requestId,
         text: finalText,
-        stage: waited.stable ? 'done' : 'done_partial',
-        error: waited.stable ? undefined : `scrape_${waited.reason}`,
+        stage: 'done',
       };
     }
 

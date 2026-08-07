@@ -2,6 +2,7 @@ import { TARGETS } from '../../shared/targets-config';
 import { chooseBestQwenResponse, normalizeQwenResponseText } from '../../shared/text-utils';
 import {
   clickSend,
+  copyLastAssistantPlaintext,
   isGenerating,
   pasteIntoComposer,
   sleep,
@@ -121,14 +122,13 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
       return { ok: true, requestId, generating: arenaStillGenerating() };
     }
     if (msg.type === 'TARGET_FETCH_LAST') {
-      const waited = await waitForStableArenaResponse();
-      if (!waited.text) return { ok: false, requestId, error: 'empty_response: belum ada respons Arena / selector berubah' };
+      const copied = await copyLastAssistantPlaintext(cfg.assistantMessages);
+      if (!copied) return { ok: false, requestId, error: 'empty_response: tombol Copy Arena tidak menghasilkan plaintext' };
       return {
         ok: true,
         requestId,
-        text: waited.text,
-        stage: waited.stable ? 'done' : 'done_partial',
-        error: waited.stable ? undefined : `scrape_${waited.reason}`,
+        text: copied,
+        stage: 'done',
       };
     }
     return { ok: false, requestId, error: 'unknown_action' };

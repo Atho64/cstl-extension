@@ -1,7 +1,7 @@
 /** Protocol version — bump if breaking */
 export const CSTL_EXT_PROTOCOL = 1 as const;
 
-export type CopasTargetId = 'gemini' | 'deepseek' | 'meta' | 'chatgpt' | 'qwen' | 'arena';
+export type CopasTargetId = 'gemini' | 'deepseek' | 'meta' | 'chatgpt' | 'qwen' | 'arena' | 'freebuff';
 
 export type CopasMode = 'semi' | 'full';
 
@@ -175,10 +175,10 @@ export const DEFAULT_SETTINGS: ExtSettings = {
   deepseekModel: 'default',
   metaModel: 'default',
   newTabEvery: 0,
-  sendCounts: { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0 },
+  sendCounts: { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0, freebuff: 0 },
 };
 
-export const CAPABLE_TARGETS: CopasTargetId[] = ['gemini', 'deepseek', 'meta', 'chatgpt', 'qwen', 'arena'];
+export const CAPABLE_TARGETS: CopasTargetId[] = ['gemini', 'deepseek', 'meta', 'chatgpt', 'qwen', 'arena', 'freebuff'];
 export const CAPABLE_MODES: CopasMode[] = ['semi', 'full'];
 export const GEMINI_MODEL_KEYS: GeminiModelKey[] = [
   'default',
@@ -259,7 +259,7 @@ export function mergeSettings(partial: Partial<ExtSettings> | undefined, base: E
   };
   if (!partial) return next;
 
-  if (partial.target === 'gemini' || partial.target === 'deepseek' || partial.target === 'meta' || partial.target === 'chatgpt' || partial.target === 'qwen' || partial.target === 'arena') {
+  if (partial.target === 'gemini' || partial.target === 'deepseek' || partial.target === 'meta' || partial.target === 'chatgpt' || partial.target === 'qwen' || partial.target === 'arena' || partial.target === 'freebuff') {
     next.target = partial.target;
   }
   if (partial.mode === 'semi' || partial.mode === 'full') next.mode = partial.mode;
@@ -284,6 +284,7 @@ export function mergeSettings(partial: Partial<ExtSettings> | undefined, base: E
       chatgpt: Math.max(0, Math.floor(Number(partial.sendCounts.chatgpt) || 0)),
       qwen: Math.max(0, Math.floor(Number(partial.sendCounts.qwen) || 0)),
       arena: Math.max(0, Math.floor(Number(partial.sendCounts.arena) || 0)),
+      freebuff: Math.max(0, Math.floor(Number(partial.sendCounts.freebuff) || 0)),
     };
   }
   return next;

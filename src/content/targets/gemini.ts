@@ -2,6 +2,7 @@ import { TARGETS, geminiModePlan } from '../../shared/targets-config';
 import {
   clickNewChat,
   clickSend,
+  copyLastAssistantPlaintext,
   isGenerating,
   pasteIntoComposer,
   selectGeminiMode,
@@ -89,28 +90,12 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
     }
 
     if (msg.type === 'TARGET_FETCH_LAST') {
-      // Also wait for text stability — Gemini can still paint late tokens
-      // after Stop disappears / Send re-enables briefly.
-      const waited = await waitForStableAssistantText(cfg.assistantMessages, {
-        timeoutMs: 60000,
-        pollMs: 350,
-        stableMs: 1500,
-        minChars: 12,
-        isStillGenerating: geminiStillGenerating,
-      });
-      if (!waited.text.trim()) {
-        return {
-          ok: false,
-          requestId,
-          error: 'empty_response: belum ada balasan model / masih generate / selector berubah',
-        };
-      }
+      const copied = await copyLastAssistantPlaintext(cfg.assistantMessages);
       return {
         ok: true,
         requestId,
-        text: waited.text,
-        stage: waited.stable ? 'done' : 'done_partial',
-        error: waited.stable ? undefined : `scrape_${waited.reason}`,
+        text: copied,
+        stage: 'done',
       };
     }
 

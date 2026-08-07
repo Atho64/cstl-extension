@@ -2,6 +2,7 @@ import { TARGETS } from '../../shared/targets-config';
 import {
   clickNewChat,
   clickSend,
+  copyLastAssistantPlaintext,
   isGenerating,
   sleep,
   waitForSelector,
@@ -22,6 +23,180 @@ const CHATGPT_STOP_SELECTORS = [
 
 function chatgptStillGenerating(): boolean {
   return isGenerating(CHATGPT_STOP_SELECTORS, cfg.sendButton, false);
+}
+
+const TEXT_FIELD_LABELS = [
+  'tampilkan di bidang teks',
+  'tampilkan dalam bidang teks',
+  'show in text field',
+  'show in text editor',
+  'open in text editor',
+  'open in canvas',
+  'edit in canvas',
+];
+
+function normalizedLabel(el: Element): string {
+  return [
+    (el as HTMLElement).innerText,
+    el.textContent,
+    el.getAttribute('aria-label'),
+    el.getAttribute('title'),
+  ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function dispatchRealisticClick(el: HTMLElement): void {
+  const eventInit: MouseEventInit = { bubbles: true, cancelable: true, view: window };
+  try { el.dispatchEvent(new PointerEvent('pointerdown', eventInit)); } catch { /* */ }
+  el.dispatchEvent(new MouseEvent('mousedown', eventInit));
+  try { el.dispatchEvent(new PointerEvent('pointerup', eventInit)); } catch { /* */ }
+  el.dispatchEvent(new MouseEvent('mouseup', eventInit));
+  el.dispatchEvent(new MouseEvent('click', eventInit));
+}
+
+/** Open ChatGPT's text-field/canvas artifact when the response is collapsed. */
+async function openLatestTextFieldIfPresent(): Promise<boolean> {
+  const selectors = 'button, a, [role="button"], [tabindex="0"], [data-testid], div, span';
+  const matches = Array.from(document.querySelectorAll<HTMLElement>(selectors))
+    .map(el => ({ el, label: normalizedLabel(el) }))
+    .filter(({ el, label }) => {
+      if (!TEXT_FIELD_LABELS.some(candidate => label.includes(candidate))) return false;
+      const textLength = label.length;
+      return textLength >= 12 && textLength <= 180 && isVisible(el);
+    })
+    .sort((a, b) => a.label.length - b.label.length);
+
+  for (const { el } of matches) {
+    // React sometimes attaches the handler to an otherwise plain parent div.
+    // A synthetic click on the text itself bubbles; if that does not open the
+    // panel, retry its nearest ancestors one by one.
+    let control: HTMLElement | null = el;
+    for (let depth = 0; depth < 6 && control; depth++, control = control.parentElement) {
+      control.scrollIntoView({ block: 'center', inline: 'center' });
+      dispatchRealisticClick(control);
+      await sleep(500);
+      if (getOpenTextFieldText()) return true;
+    }
+    // The panel may need longer to mount even though the click succeeded.
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Long prompts pasted into ChatGPT can become an attachment card instead of
+ * editable composer text. Expand that card before clicking Send.
+ */
+async function expandComposerAttachment(composer: HTMLElement, payload: string): Promise<boolean> {
+  const minimumExpandedLength = Math.min(200, Math.max(20, Math.floor(payload.length * 0.1)));
+  const composerLength = () => (composer.innerText || composer.textContent || '').trim().length;
+  if (composerLength() >= minimumExpandedLength) return true;
+
+  const deadline = Date.now() + 12000;
+  while (Date.now() < deadline) {
+    const buttons = Array.from(document.querySelectorAll<HTMLElement>('button, [role="button"]'));
+    const showButton = buttons.find(el => {
+      const label = normalizedLabel(el);
+      return TEXT_FIELD_LABELS.some(candidate => label === candidate || label.includes(candidate));
+    });
+
+    if (showButton && isVisible(showButton)) {
+      showButton.scrollIntoView({ block: 'center', inline: 'center' });
+      dispatchRealisticClick(showButton);
+
+      const expandDeadline = Date.now() + 10000;
+      while (Date.now() < expandDeadline) {
+        if (composerLength() >= minimumExpandedLength) return true;
+        await sleep(200);
+      }
+      return false;
+    }
+
+    // The attachment UI may mount shortly after the paste event.
+    if (composerLength() >= minimumExpandedLength) return true;
+    await sleep(200);
+  }
+
+  // Short prompts may remain directly in the editor without an attachment.
+  return composerLength() > 0;
+}
+
+function isVisible(el: HTMLElement): boolean {
+  const style = window.getComputedStyle(el);
+  const rect = el.getBoundingClientRect();
+  return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+}
+
+/** Read the largest visible editor opened by "Tampilkan di bidang teks". */
+function collectTextFieldCandidates(root: Document | ShadowRoot, candidates: string[]): void {
+  const selectors = [
+    '[data-testid*="canvas" i] [contenteditable="true"]',
+    '[data-testid*="text-editor" i] [contenteditable="true"]',
+    '[class*="canvas" i] [contenteditable="true"]',
+    '[class*="text-editor" i] [contenteditable="true"]',
+    '.ProseMirror[contenteditable="true"]',
+    '.cm-content[contenteditable="true"]',
+    '[contenteditable="true"]',
+    'textarea[data-testid*="canvas" i]',
+    'textarea[class*="editor" i]',
+    'textarea:not(#prompt-textarea)',
+    '[data-testid*="canvas" i]',
+    '[data-testid*="artifact" i]',
+    '[class*="canvas" i] [class*="prose" i]',
+    '[class*="artifact" i] [class*="prose" i]',
+    'aside [class*="prose" i]',
+    '[role="dialog"] [class*="prose" i]',
+  ];
+  const seen = new Set<Element>();
+  for (const selector of selectors) {
+    for (const el of Array.from(root.querySelectorAll<HTMLElement>(selector))) {
+      if (seen.has(el) || !isVisible(el) || el.id === 'prompt-textarea' || el.closest('form')) continue;
+      seen.add(el);
+      const text = el instanceof HTMLTextAreaElement ? el.value : (el.innerText || el.textContent || '');
+      const clean = text.replace(/\u00a0/g, ' ').trim();
+      if (clean.length > 12 && !TEXT_FIELD_LABELS.some(label => clean.toLowerCase() === label)) candidates.push(clean);
+    }
+  }
+
+  // Canvas may be mounted in an open shadow root.
+  for (const host of Array.from(root.querySelectorAll<HTMLElement>('*'))) {
+    if (host.shadowRoot) collectTextFieldCandidates(host.shadowRoot, candidates);
+  }
+}
+
+function getOpenTextFieldText(): string {
+  const candidates: string[] = [];
+  collectTextFieldCandidates(document, candidates);
+
+  // Some ChatGPT Canvas builds render the editor inside a same-origin iframe.
+  for (const frame of Array.from(document.querySelectorAll<HTMLIFrameElement>('iframe'))) {
+    try {
+      if (frame.contentDocument) collectTextFieldCandidates(frame.contentDocument, candidates);
+    } catch { /* cross-origin frame; cannot inspect from this content script */ }
+  }
+
+  const composerText = (document.querySelector<HTMLElement>('#prompt-textarea')?.innerText || '').trim();
+  const unique = Array.from(new Set(candidates)).filter(text => text !== composerText);
+  return unique.sort((a, b) => b.length - a.length)[0] || '';
+}
+
+async function waitForOpenTextFieldText(timeoutMs = 30000): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  let best = '';
+  let previous = '';
+  let stableSince = 0;
+  while (Date.now() < deadline) {
+    const current = getOpenTextFieldText();
+    if (current.length > best.length) best = current;
+    if (current && current === previous) {
+      if (!stableSince) stableSince = Date.now();
+      if (Date.now() - stableSince >= 1500) return current;
+    } else {
+      previous = current;
+      stableSince = current ? Date.now() : 0;
+    }
+    await sleep(250);
+  }
+  return best;
 }
 
 /**
@@ -174,6 +349,18 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
 
       await sleep(150);
 
+      // ChatGPT turns long pasted prompts into a document attachment. Click
+      // "Tampilkan di bidang teks" first so the full prompt is restored into
+      // #prompt-textarea before attempting to send it.
+      const expanded = await expandComposerAttachment(el as HTMLElement, msg.payload);
+      if (!expanded) {
+        return {
+          ok: false,
+          requestId,
+          error: 'composer_attachment_expand_failed: tombol Tampilkan di bidang teks ditemukan tetapi isi belum terbuka',
+        };
+      }
+
       if (msg.mode === 'full') {
         // Perlu delay lebih setelah paste sebelum kirim agar ChatGPT mengaktifkan tombol Send
         await sleep(300);
@@ -203,17 +390,7 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
     }
 
     if (msg.type === 'TARGET_FETCH_LAST') {
-      const waited = await waitForStableAssistantText(cfg.assistantMessages, {
-        timeoutMs: 90000,
-        pollMs: 350,
-        stableMs: 1800,
-        minChars: 12,
-        isStillGenerating: chatgptStillGenerating,
-      });
-
-      // Gunakan DOM scraper khusus yang lebih presisi (buang script/button noise)
-      const domText = chatgptGetResponseText();
-      const finalText = domText.trim() || waited.text.trim();
+      const finalText = await copyLastAssistantPlaintext(cfg.assistantMessages);
 
       if (!finalText) {
         return {
@@ -226,8 +403,7 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
         ok: true,
         requestId,
         text: finalText,
-        stage: waited.stable ? 'done' : 'done_partial',
-        error: waited.stable ? undefined : `scrape_${waited.reason}`,
+        stage: 'done',
       };
     }
 

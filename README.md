@@ -40,6 +40,7 @@ Browser extension (Chrome/Edge/Quetta Android — MV3) yang bekerja bersama CSTL
 - ChatGPT (`chatgpt.com`)
 - Qwen Studio (`chat.qwen.ai`)
 - Arena Direct (`arena.ai/text/direct`) — memakai tab yang sudah terbuka dan model yang dipilih manual
+- Freebuff Chat (`freebuff.com/chat`) — model default situs, tanpa pemilih model
 
 Pemilih model Gemini saat ini mengenali **3.6 Flash**, **3.5 Flash-Lite**, dan **Pro**, masing-masing dengan opsi thinking aktif/nonaktif. Pemilihan dilakukan secara best-effort mengikuti label UI Gemini web.
 
@@ -72,6 +73,6 @@ Setelah rebuild, klik "Reload" di chrome://extensions.
 
 ## Privasi
 
-- Extension hanya beroperasi di tab Gemini, DeepSeek, Meta AI, ChatGPT, dan origin CSTL
+- Extension hanya beroperasi di tab Gemini, DeepSeek, Meta AI, ChatGPT, Qwen, Arena, Freebuff, dan origin CSTL
 - Tidak ada data yang di-upload ke server manapun
 - Semua komunikasi terjadi lokal di browser

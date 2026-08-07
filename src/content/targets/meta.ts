@@ -2,6 +2,7 @@ import { TARGETS } from '../../shared/targets-config';
 import {
   clickNewChat,
   clickSend,
+  copyLastAssistantPlaintext,
   isGenerating,
   sleep,
   waitForSelector,
@@ -297,12 +298,9 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
       return { ok: true, requestId, generating: metaStillGenerating() };
     }
     if (msg.type === 'TARGET_FETCH_LAST') {
-      const waited = await waitForStableAssistantText(cfg.assistantMessages, {
-        timeoutMs: 90_000, pollMs: 350, stableMs: 1_800, minChars: 12, isStillGenerating: metaStillGenerating,
-      });
-      const text = getNewMetaResponse();
+      const text = await copyLastAssistantPlaintext(cfg.assistantMessages);
       if (!text) return { ok: false, requestId, error: 'empty_response: belum ada respons Meta AI baru atau selector berubah' };
-      return { ok: true, requestId, text, stage: waited.stable ? 'done' : 'done_partial' };
+      return { ok: true, requestId, text, stage: 'done' };
     }
     return { ok: false, requestId, error: 'unknown_action' };
   } catch (e) {

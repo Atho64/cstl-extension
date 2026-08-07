@@ -48,13 +48,14 @@ function summarize(s: ExtSettings): string {
     ? `deepseek=${s.deepseekModel}`
     : s.target === 'gemini' ? `gemini=${s.geminiModel}`
     : s.target === 'chatgpt' ? 'chatgpt=default'
-    : s.target === 'qwen' ? 'qwen=default' : 'default';
+    : s.target === 'qwen' ? 'qwen=default'
+    : s.target === 'freebuff' ? 'freebuff=default' : 'default';
   const resolvedModel = s.target === 'arena' ? 'arena=manual' : model;
   const n = s.newTabEvery || 0;
   const tab =
     n <= 0 ? 'lanjut chat sama' : n === 1 ? 'New Chat tiap request' : `New Chat tiap ${n} request`;
   const c = s.sendCounts || {};
-  return `Target: ${s.target}\nMode: ${s.mode}\nModel: ${resolvedModel}\nChat: ${tab}\nCounter: gemini=${c.gemini || 0}, deepseek=${c.deepseek || 0}, meta=${c.meta || 0}, chatgpt=${c.chatgpt || 0}, qwen=${c.qwen || 0}, arena=${c.arena || 0}`;
+  return `Target: ${s.target}\nMode: ${s.mode}\nModel: ${resolvedModel}\nChat: ${tab}\nCounter: gemini=${c.gemini || 0}, deepseek=${c.deepseek || 0}, meta=${c.meta || 0}, chatgpt=${c.chatgpt || 0}, qwen=${c.qwen || 0}, arena=${c.arena || 0}, freebuff=${c.freebuff || 0}`;
 }
 
 async function load() {
@@ -65,7 +66,7 @@ async function load() {
     requestId: rid(),
   });
   const s: ExtSettings = res?.settings || DEFAULT_SETTINGS;
-  targetEl.value = (s.target === 'deepseek' || s.target === 'meta' || s.target === 'chatgpt' || s.target === 'qwen' || s.target === 'arena') ? s.target : 'gemini';
+  targetEl.value = (s.target === 'deepseek' || s.target === 'meta' || s.target === 'chatgpt' || s.target === 'qwen' || s.target === 'arena' || s.target === 'freebuff') ? s.target : 'gemini';
   modeEl.value = s.mode === 'full' ? 'full' : 'semi';
   geminiModelEl.value = s.geminiModel || 'default';
   // normalize legacy thinking → pro_think
@@ -154,7 +155,7 @@ btnResetCount.addEventListener('click', async () => {
     v: CSTL_EXT_PROTOCOL,
     type: 'COPAS_SET_SETTINGS',
     requestId: rid(),
-    settings: { sendCounts: { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0 } },
+    settings: { sendCounts: { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0, freebuff: 0 } },
   });
   const s: ExtSettings = res?.settings || DEFAULT_SETTINGS;
   setStatus(`Counter di-reset.\n${summarize(s)}`);

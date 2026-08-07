@@ -232,6 +232,78 @@ export function getLastAssistantText(selectors: string[]): string {
   return '';
 }
 
+/**
+ * Copy the last assistant response through the target site's own Copy/Salin
+ * control, then read the clipboard. This is intentionally separate from the
+ * DOM text helpers: auto-copas must return the plaintext produced by the
+ * site's copy action, never a DOM scrape.
+ */
+export async function copyLastAssistantPlaintext(selectors: string[], timeoutMs = 5000): Promise<string> {
+  const nodes = queryAll(selectors).filter((el) => isVisible(el));
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    let root = nodes[i] as HTMLElement;
+    // Copy controls are often siblings of the markdown node, on the message
+    // bubble or conversation-turn wrapper rather than inside the text node.
+    for (let depth = 0; depth < 4 && root; depth++) {
+      if (root.querySelector('button, [role="button"], [aria-label], [title], [data-testid]')) break;
+      root = root.parentElement as HTMLElement;
+    }
+    // Response actions on DeepSeek/Meta are hover-only.
+    root.scrollIntoView({ block: 'center', inline: 'nearest' });
+    root.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    root.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    await sleep(180);
+    let buttons = Array.from(root.querySelectorAll<HTMLElement>(
+      'button, [role="button"], [aria-label], [title], [data-testid], [class*="copy" i]'
+    ));
+    // DeepSeek renders the action toolbar as a sibling of the markdown node.
+    // If the scoped response root has no copy control, inspect visible copy
+    // controls globally and use the last one (latest assistant turn).
+    if (!buttons.some((el) => /copy|salin|menyalin/i.test(
+      [el.getAttribute('aria-label'), el.getAttribute('title'), el.getAttribute('data-testid'), el.className?.toString(), el.innerText]
+        .filter(Boolean).join(' ')))) {
+      buttons = Array.from(document.querySelectorAll<HTMLElement>(
+        'button, [role="button"], [aria-label], [title], [data-testid], [class*="copy" i]'
+      ));
+    }
+    const copy = buttons.reverse().find((el) => {
+      if (!isVisible(el)) return false;
+      const icon = el.querySelector('[aria-label], [data-icon], use') as Element | null;
+      const label = [
+        el.getAttribute('aria-label'), el.getAttribute('title'), el.getAttribute('data-testid'),
+        el.className?.toString(), el.innerText, icon?.getAttribute('aria-label'),
+        icon?.getAttribute('data-icon'), icon?.getAttribute('href'), icon?.getAttribute('xlink:href'),
+      ]
+        .filter(Boolean).join(' ').replace(/\s+/g, ' ').toLowerCase();
+      return /(^|\b)(copy|salin|copy text|copy response|menyalin)(\b|$)/i.test(label) || /\bcopy\b/i.test(label);
+    });
+    if (!copy) continue;
+    try {
+      // Mark the clipboard before clicking. Several LLMs update the clipboard
+      // asynchronously; reading immediately otherwise returns the previous
+      // batch, which looks like a successful but stale result.
+      const sentinel = `__CSTL_COPY_PENDING_${Date.now()}_${Math.random().toString(36).slice(2)}__`;
+      let sentinelArmed = false;
+      try {
+        await navigator.clipboard.writeText(sentinel);
+        sentinelArmed = true;
+      } catch { /* fall back to comparing against the previous value */ }
+      const previous = sentinelArmed ? sentinel : await navigator.clipboard.readText().catch(() => '');
+      (copy as HTMLElement).click();
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        try {
+          const text = await navigator.clipboard.readText();
+          const normalized = text.replace(/\r\n/g, '\n').trim();
+          if (normalized && normalized !== previous && !normalized.startsWith('__CSTL_COPY_PENDING_')) return normalized;
+        } catch { /* clipboard may not be ready yet */ }
+        await sleep(150);
+      }
+    } catch { /* try an earlier response copy button */ }
+  }
+  throw new Error('copy_button_or_clipboard_unavailable: klik Copy/Salin pada respons terakhir gagal');
+}
+
 /** Same as getLastAssistantText, but ignore a just-submitted user message. */
 export function getLastAssistantTextExcluding(selectors: string[], excluded: string): string {
   const excludedNorm = excluded.replace(/\s+/g, ' ').trim();

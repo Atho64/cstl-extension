@@ -3,6 +3,7 @@ import { chooseBestQwenResponse, normalizeQwenResponseText } from '../../shared/
 import {
   clickNewChat,
   clickSend,
+  copyLastAssistantPlaintext,
   isGenerating,
   pasteIntoComposer,
   sleep,
@@ -24,6 +25,25 @@ function qwenStillGenerating(): boolean {
   return isGenerating(QWEN_STOP_SELECTORS, cfg.sendButton, false);
 }
 
+function extractQwenNodeText(node: HTMLElement): string {
+  // Qwen renders plaintext blocks with Monaco. Reading the parent includes
+  // the visual gutter ("123...25") before the actual response. Read Monaco's
+  // content rows directly so every logical line gets a real newline.
+  const viewLines = Array.from(node.querySelectorAll<HTMLElement>('.view-lines .view-line'));
+  if (viewLines.length) {
+    const lines = viewLines
+      .map(line => (line.innerText || line.textContent || '').replace(/\u00a0/g, ' ').trimEnd())
+      .filter(Boolean);
+    if (lines.length) return lines.join('\n');
+  }
+
+  const clone = node.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll(
+    'script, style, noscript, button, [role="button"], svg, [aria-label*="Copy" i], [class*="toolbar" i], [class*="action" i], .margin, .margin-view-overlays, .line-numbers'
+  ).forEach((child) => child.remove());
+  return clone.innerText || clone.textContent || '';
+}
+
 function getQwenResponseText(): string {
   const candidates: string[] = [];
   const seen = new Set<string>();
@@ -31,11 +51,7 @@ function getQwenResponseText(): string {
     try {
       const nodes = Array.from(document.querySelectorAll<HTMLElement>(selector));
       for (let i = nodes.length - 1; i >= 0; i--) {
-        const clone = nodes[i].cloneNode(true) as HTMLElement;
-        clone.querySelectorAll(
-          'script, style, noscript, button, [role="button"], svg, [aria-label*="Copy" i], [class*="toolbar" i], [class*="action" i]'
-        ).forEach((node) => node.remove());
-        const text = normalizeQwenResponseText(clone.innerText || clone.textContent || '');
+        const text = normalizeQwenResponseText(extractQwenNodeText(nodes[i]));
         if (text.length > 12 && !seen.has(text)) {
           seen.add(text);
           candidates.push(text);
@@ -115,15 +131,13 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
     }
 
     if (msg.type === 'TARGET_FETCH_LAST') {
-      const waited = await waitForStableQwenResponse();
-      const text = waited.text;
+      const text = await copyLastAssistantPlaintext(cfg.assistantMessages);
       if (!text) return { ok: false, requestId, error: 'empty_response: belum ada balasan Qwen / masih generate / selector berubah' };
       return {
         ok: true,
         requestId,
         text,
-        stage: waited.stable ? 'done' : 'done_partial',
-        error: waited.stable ? undefined : `scrape_${waited.reason}`,
+        stage: 'done',
       };
     }
 

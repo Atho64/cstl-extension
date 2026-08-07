@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "CSTL Auto Copas",
-  "version": "0.1.21",
+  "version": "0.1.27",
   "minimum_chrome_version": "109",
-  "description": "Bridge CSTL PWA ke tab LLM (Gemini, DeepSeek, Meta AI, ChatGPT, Qwen, Arena) untuk auto copy-paste terjemahan.",
+  "description": "Bridge CSTL PWA ke tab LLM (Gemini, DeepSeek, Meta AI, ChatGPT, Qwen, Arena, Freebuff) untuk auto copy-paste terjemahan.",
   "action": {
     "default_popup": "popup/popup.html",
     "default_title": "CSTL Auto Copas"
@@ -12,7 +12,7 @@
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["tabs", "storage", "scripting", "clipboardWrite"],
+  "permissions": ["tabs", "storage", "scripting", "clipboardRead", "clipboardWrite"],
   "host_permissions": [
     "https://gemini.google.com/*",
     "https://chat.deepseek.com/*",
@@ -21,6 +21,7 @@
     "https://chatgpt.com/*",
     "https://chat.qwen.ai/*",
     "https://arena.ai/*",
+    "https://freebuff.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
     "https://atho64.github.io/*"
@@ -63,6 +64,11 @@
     {
       "matches": ["https://arena.ai/text/direct*", "https://arena.ai/c/*"],
       "js": ["content/targets/arena.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://freebuff.com/*"],
+      "js": ["content/targets/freebuff.js"],
       "run_at": "document_idle"
     }
   ],

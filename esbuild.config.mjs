@@ -36,6 +36,7 @@ const entryPoints = {
   'content/targets/chatgpt': 'src/content/targets/chatgpt.ts',
   'content/targets/qwen': 'src/content/targets/qwen.ts',
   'content/targets/arena': 'src/content/targets/arena.ts',
+  'content/targets/freebuff': 'src/content/targets/freebuff.ts',
   'popup/popup': 'src/popup/popup.ts',
 };
 

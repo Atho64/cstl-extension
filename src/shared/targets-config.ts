@@ -277,6 +277,28 @@ export const TARGETS: Record<CopasTargetId, TargetConfig> = {
     modelMenu: [],
     newChatLabels: ['new chat'],
   },
+  freebuff: {
+    id: 'freebuff',
+    label: 'Freebuff Chat',
+    url: 'https://freebuff.com/chat',
+    matches: ['https://freebuff.com/chat*', 'https://freebuff.com/c/*'],
+    composer: [
+      'textarea[placeholder="Ask anything"]',
+      'textarea[placeholder*="Ask" i]',
+      'textarea',
+    ],
+    sendButton: [
+      'button[aria-label="Send message"]',
+      'button[aria-label*="Send" i]',
+      'button[type="submit"]',
+    ],
+    assistantMessages: [
+      'div.chat-markdown',
+    ],
+    modelPickerOpen: [],
+    modelMenu: [],
+    newChatLabels: ['new chat', 'chat baru', 'obrolan baru', 'new conversation'],
+  },
 };
 
 /** Search phrases used when clicking a model option (order = priority). */
@@ -399,7 +421,7 @@ export function deepseekModePlan(key: string): DeepseekModePlan {
 }
 
 export function getTargetConfig(id: CopasTargetId): TargetConfig | null {
-  if (id === 'gemini' || id === 'deepseek' || id === 'meta' || id === 'chatgpt' || id === 'qwen' || id === 'arena') return TARGETS[id];
+  if (id === 'gemini' || id === 'deepseek' || id === 'meta' || id === 'chatgpt' || id === 'qwen' || id === 'arena' || id === 'freebuff') return TARGETS[id];
   return null;
 }
 
@@ -415,6 +437,7 @@ export function tabMatchesTarget(url: string | undefined, id: CopasTargetId): bo
     if (id === 'chatgpt') return u.hostname === 'chatgpt.com';
     if (id === 'qwen') return u.hostname === 'chat.qwen.ai';
     if (id === 'arena') return u.hostname === 'arena.ai' && (u.pathname.startsWith('/text/direct') || u.pathname.startsWith('/c/'));
+    if (id === 'freebuff') return u.hostname === 'freebuff.com' && (u.pathname === '/chat' || u.pathname.startsWith('/chat') || u.pathname.startsWith('/c/'));
   } catch {
     return false;
   }

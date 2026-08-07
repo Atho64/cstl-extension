@@ -72,7 +72,7 @@ async function saveSettings(partial: Partial<ExtSettings>): Promise<ExtSettings>
     deepseekModel: next.deepseekModel,
     metaModel: next.metaModel,
     newTabEvery: next.newTabEvery,
-    sendCounts: next.sendCounts || { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0 },
+    sendCounts: next.sendCounts || { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0, freebuff: 0 },
   });
   return next;
 }
@@ -139,7 +139,7 @@ async function shouldStartNewChat(target: CopasTargetId): Promise<{
 }> {
   const settings = await loadSettings();
   const every = settings.newTabEvery || 0;
-  const counts = { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0, ...(settings.sendCounts || {}) };
+  const counts = { gemini: 0, deepseek: 0, meta: 0, chatgpt: 0, qwen: 0, arena: 0, freebuff: 0, ...(settings.sendCounts || {}) };
   const nextCount = (counts[target] || 0) + 1;
   counts[target] = nextCount;
   await saveSettings({ sendCounts: counts });
@@ -252,6 +252,8 @@ async function sendToTab(
           ? 'content/targets/qwen.js'
         : target === 'arena'
           ? 'content/targets/arena.js'
+        : target === 'freebuff'
+          ? 'content/targets/freebuff.js'
         : target === 'gemini'
           ? 'content/targets/gemini.js'
           : null;
@@ -326,7 +328,7 @@ async function fullAutoFlow(
 
   await pushStatus(requestId, 'submitted', 'Pesan terkirim. Menunggu respons...');
   // Give the stream time to start so we don't treat pre-send idle as "done".
-  await sleep(target === 'deepseek' ? 1800 : target === 'qwen' ? 3000 : 1200);
+  await sleep(target === 'deepseek' ? 1800 : target === 'qwen' ? 3000 : target === 'freebuff' ? 2000 : 1200);
 
   // 2. Wait until UI stops reporting "generating".
   // DeepSeek's Stop control is flaky; TARGET_FETCH_LAST also waits for text
@@ -447,6 +449,11 @@ async function handleSend(msg: Extract<CstlToExtMessage, { type: 'COPAS_SEND' }>
         await sleep(1000);
       } else if (target === 'qwen') {
         await chrome.tabs.update(tabId, { url: TARGETS.qwen.url });
+        await waitTabComplete(tabId, 30000);
+        await sleep(1000);
+      } else if (target === 'freebuff') {
+        // Freebuff: /chat is always a fresh conversation
+        await chrome.tabs.update(tabId, { url: TARGETS.freebuff.url });
         await waitTabComplete(tabId, 30000);
         await sleep(1000);
       } else {
