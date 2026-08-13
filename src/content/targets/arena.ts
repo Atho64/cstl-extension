@@ -1,6 +1,7 @@
 import { TARGETS } from '../../shared/targets-config';
 import { chooseBestQwenResponse, normalizeQwenResponseText } from '../../shared/text-utils';
 import {
+  clickNewChat,
   clickSend,
   copyLastAssistantPlaintext,
   isGenerating,
@@ -95,7 +96,13 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
   const requestId = msg.requestId;
   try {
     if (msg.type === 'TARGET_NEW_CHAT') {
-      return { ok: true, requestId, stage: 'new_chat', detail: 'arena_existing_chat_keep' };
+      const r = await clickNewChat(cfg.newChatLabels);
+      if (r.ok) {
+        await sleep(700);
+        responseBaseline = new Set();
+        lastSubmittedPayload = '';
+      }
+      return { ok: r.ok, requestId, stage: 'new_chat', detail: r.detail, error: r.ok ? undefined : r.detail };
     }
     if (msg.type === 'TARGET_SELECT_MODEL') {
       return { ok: true, requestId, stage: 'model', detail: 'arena_model_manual' };
@@ -122,13 +129,30 @@ async function handle(msg: TargetAction): Promise<TargetActionResult> {
       return { ok: true, requestId, generating: arenaStillGenerating() };
     }
     if (msg.type === 'TARGET_FETCH_LAST') {
-      const copied = await copyLastAssistantPlaintext(cfg.assistantMessages);
-      if (!copied) return { ok: false, requestId, error: 'empty_response: tombol Copy Arena tidak menghasilkan plaintext' };
+      const genDeadline = Date.now() + 30000;
+      while (arenaStillGenerating() && Date.now() < genDeadline) {
+        await sleep(400);
+      }
+      let copied: string | null = null;
+      try {
+        copied = await copyLastAssistantPlaintext(cfg.assistantMessages, 7000);
+      } catch {
+        copied = null;
+      }
+      if (copied) {
+        const normalized = normalizeQwenResponseText(copied);
+        if (normalized.trim().length >= 12) {
+          return { ok: true, requestId, text: normalized, stage: 'done' };
+        }
+      }
+      const waited = await waitForStableArenaResponse();
+      if (!waited.text) return { ok: false, requestId, error: 'empty_response: belum ada respons Arena / selector berubah' };
       return {
         ok: true,
         requestId,
-        text: copied,
-        stage: 'done',
+        text: waited.text,
+        stage: waited.stable ? 'done' : 'done_partial',
+        error: waited.stable ? undefined : `scrape_${waited.reason}`,
       };
     }
     return { ok: false, requestId, error: 'unknown_action' };

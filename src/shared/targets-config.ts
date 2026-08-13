@@ -275,7 +275,7 @@ export const TARGETS: Record<CopasTargetId, TargetConfig> = {
     ],
     modelPickerOpen: [],
     modelMenu: [],
-    newChatLabels: ['new chat'],
+    newChatLabels: ['new chat', 'chat baru', 'obrolan baru', 'new conversation', 'percakapan baru', 'mulai chat', 'baru'],
   },
   freebuff: {
     id: 'freebuff',

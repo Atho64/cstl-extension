@@ -3,3 +3,5 @@ dist/
 tests/
 *.local
 .DS_Store
+*.zip
+releases/

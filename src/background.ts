@@ -425,9 +425,7 @@ async function handleSend(msg: Extract<CstlToExtMessage, { type: 'COPAS_SEND' }>
   pruneJobs();
 
   try {
-    const chatPolicy = target === 'arena'
-      ? { forceNew: false, count: 0, every: 0, settings }
-      : await shouldStartNewChat(target);
+    const chatPolicy = await shouldStartNewChat(target);
     const tabId = await findOrCreateTab(target);
     job.tabId = tabId;
     job.stage = 'finding_tab';
@@ -439,11 +437,8 @@ async function handleSend(msg: Extract<CstlToExtMessage, { type: 'COPAS_SEND' }>
         `Obrolan baru (#${chatPolicy.count}, tiap ${chatPolicy.every || 1} req)...`
       );
       if (target === 'deepseek') {
-        // Deterministic in-tab New Chat: reset the existing DeepSeek tab to
-        // its blank-chat route instead of guessing a sidebar button.
         await startFreshDeepseekChat(tabId);
       } else if (target === 'chatgpt') {
-        // ChatGPT: navigate to root URL for a fresh chat
         await chrome.tabs.update(tabId, { url: TARGETS.chatgpt.url });
         await waitTabComplete(tabId, 30000);
         await sleep(1000);
@@ -452,7 +447,6 @@ async function handleSend(msg: Extract<CstlToExtMessage, { type: 'COPAS_SEND' }>
         await waitTabComplete(tabId, 30000);
         await sleep(1000);
       } else if (target === 'freebuff') {
-        // Freebuff: /chat is always a fresh conversation
         await chrome.tabs.update(tabId, { url: TARGETS.freebuff.url });
         await waitTabComplete(tabId, 30000);
         await sleep(1000);
